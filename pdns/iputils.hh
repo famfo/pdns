@@ -1635,6 +1635,27 @@ public:
 private:
   [[nodiscard]] node_type* lookupImpl(const key_type& value, uint8_t max_bits) const
   {
+    auto* node = lookupImplUnmapped(value, max_bits);
+
+    // If no node is found and the address is an IPv6 mapped IPv4 address,
+    // retry the lookup after unmapping the IPv4 address.
+    auto address = value.getNetwork();
+    if (node == nullptr && address.isMappedIPv4()) {
+      auto mapped_addr = address.mapToIPv4();
+      auto addr_bits = mapped_addr.getBits();
+
+      if (max_bits > addr_bits) {
+        max_bits = addr_bits;
+      }
+
+      node = lookupImplUnmapped(key_type(mapped_addr, max_bits), max_bits);
+    }
+
+    return node;
+  }
+
+  [[nodiscard]] node_type* lookupImplUnmapped(const key_type& value, uint8_t max_bits) const
+  {
     TreeNode* node = nullptr;
 
     if (value.isIPv4()) {
